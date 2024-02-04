@@ -1,0 +1,47 @@
+libhackrf_build:
+https://github.com/greatscottgadgets/hackrf.git
+
+cmake ../ -G "MSYS Makefiles" -DLIBUSB_LIBRARIES=/ucrt64/lib/libusb-1.0.a -DLIBUSB_INCLUDE_DIR=/ucrt64/include/libusb-1.0 -DFFTW_INCLUDES=/ucrt64/include -DFFTW_LIBRARIES=/ucrt64/lib
+
+general_build:
+cmake ../ -G "MSYS Makefiles"
+make
+make install
+
+SoapySDR: 		https://github.com/pothosware/SoapySDR.git
+SoapySDR Hackrf: 	https://github.com/pothosware/SoapyHackRF.git
+
+MSYS  ->	Matplotlib
+		Cmake
+		Libusb
+		FFTW
+		Scipy
+		Pyqtgraph
+		Pyqt6
+
+Build ->	LibHACKRF
+		SWIG
+		SoapySDR
+		SoapySDRHACKRF
+
+
+SoapySDR_PATH:->SOAPY_SDR_ROOT=C:\msys64\ucrt64
+		SOAPY_SDR_PLUGIN_PATH=C:\msys64\ucrt64\lib\SoapySDR\modules0.8-3
+
+Python_Path:  ->PYTHONPATH=C:\msys64\ucrt64\bin
+			   C:\msys64\ucrt64\include
+			   C:\msys64\ucrt64\lib
+			   C:\msys64\ucrt64\share
+			   C:\msys64\ucrt64\lib\python3.11
+			   C:\msys64\ucrt64\lib\python3.11\site-packages
+			   C:\msys64\ucrt64\lib\SoapySDR
+			   C:\msys64\ucrt64\lib\SoapySDR\modules0.8-3
+
+Path:	C:\msys64\ucrt64\bin
+	C:\msys64\ucrt64\include
+	C:\msys64\ucrt64\lib
+	C:\msys64\ucrt64\share
+	C:\msys64\ucrt64\lib\python3.11
+	C:\msys64\ucrt64\lib\python3.11\site-packages
+	C:\msys64\ucrt64\lib\SoapySDR
+	C:\msys64\ucrt64\lib\SoapySDR\modules0.8-3
