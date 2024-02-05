@@ -253,7 +253,14 @@ def FM_Audio(sample_rate,Mode,Data_len,Fm_Manager):
                 else:
                     wavfile.write('sound1.wav', int(44100), numpy.round(Mono * 32767).astype(numpy.int16))
 
-def FM_RDS(sample_rate,RDS_sample_rate,Fm_Condition,RDS_Condition,Data_len,Rds_Sz):
+def FM_RDS(sample_rate,RDS_sample_rate,Fm_Condition,Data_len,Rds_Sz):
+
+    phase = 0
+    freq = 0
+    mu = 0.01 # initial estimate of phase of sample
+    sps = 16
+
+            
     while True:
         with Fm_Condition:
             Buffer=numpy.array([0]*Data_len,dtype=numpy.float64)
@@ -276,39 +283,59 @@ def FM_RDS(sample_rate,RDS_sample_rate,Fm_Condition,RDS_Condition,Data_len,Rds_S
             b, a = scipy.signal.iirdesign(wp=7.5e3,ws=8e3,gpass=0.1, gstop=60, fs=int(sample_rate), ftype="ellip")
             Buffer=scipy.signal.filtfilt(b, a, Buffer)
 
-            with  RDS_Condition:
-                RDSData_mem   = shared_memory.SharedMemory(name='RDSData')
-                RDSData       = numpy.ndarray((Rds_Sz), dtype=numpy.float64, buffer=RDSData_mem.buf)
-                numpy.copyto(RDSData,numpy.real(Buffer[0:Rds_Sz]))
-                RDSData_mem.close()
-                RDS_Condition.notify()
-
             # Remuestreo a 19KHz
             Buffer=scipy.signal.resample_poly(Buffer, RDS_sample_rate , sample_rate)
 
+            # Sincronizacion temporal de las muestras - Samples at 19KHz to Samples at 1187.5Hz , Sample length / 16
+            # Sincronizacion de Mueller and mueller clock recovery
+
             # Symbol sync, using what we did in sync chapter
-            samples = Buffer # for the sake of matching the sync chapter
-            samples_interpolated = scipy.signal.resample_poly(samples, 32, 1) # we'll use 32 as the interpolation factor, arbitrarily chosen, seems to work better than 16
-            sps = 16
-            mu = 0.01 # initial estimate of phase of sample
-            out = numpy.zeros(len(samples) + 10, dtype=numpy.complex64)
-            out_rail = numpy.zeros(len(samples) + 10, dtype=numpy.complex64) # stores values, each iteration we need the previous 2 values plus current value
+
+            samples_interpolated = scipy.signal.resample_poly(Buffer, 32, 1) # we'll use 32 as the interpolation factor, arbitrarily chosen, seems to work better than 16
+            out = numpy.zeros(len(Buffer) + 10, dtype=numpy.complex64)
+            out_rail = numpy.zeros(len(Buffer) + 10, dtype=numpy.complex64) # stores values, each iteration we need the previous 2 values plus current value
             i_in = 0 # input samples index
             i_out = 2 # output index (let first two outputs be 0)
-            while i_out < len(samples) and i_in+32 < len(samples):
+            while i_out < len(Buffer) and i_in+32 < len(Buffer):
                 out[i_out] = samples_interpolated[i_in*32 + int(mu*32)] # grab what we think is the "best" sample
                 out_rail[i_out] = int(numpy.real(out[i_out]) > 0) + 1j*int(numpy.imag(out[i_out]) > 0)
                 x = (out_rail[i_out] - out_rail[i_out-2]) * numpy.conj(out[i_out-1])
                 y = (out[i_out] - out[i_out-2]) * numpy.conj(out_rail[i_out-1])
                 mm_val = numpy.real(y - x)
-                mu += sps + 0.01*mm_val
+                mu += sps + 0.3*mm_val
                 i_in += int(numpy.floor(mu)) # round down to nearest int since we are using it as an index
                 mu = mu - numpy.floor(mu) # remove the integer part of mu
                 i_out += 1 # increment output index
+            print(mu)
             Buffer = out[2:i_out] # remo
 
+
+            # # Fine freq sync
+            # N = len(Buffer)
+
+            # # These next two params is what to adjust, to make the feedback loop faster or slower (which impacts stability)
+            # alpha = 16
+            # beta = 0.002
+            # out = numpy.zeros(N, dtype=numpy.complex64)
+            # for i in range(N):
+            #     out[i] = Buffer[i] * numpy.exp(-1j*phase) # adjust the input sample by the inverse of the estimated phase offset
+            #     error = numpy.real(out[i]) * numpy.imag(out[i]) # This is the error formula for 2nd order Costas Loop (e.g. for BPSK)
+
+            #     # Advance the loop (recalc phase and freq offset)
+            #     freq += (beta * error)
+            #     print(freq * RDS_sample_rate / (2*numpy.pi)) # convert from angular velocity to Hz for logging
+            #     phase += freq + (alpha * error)
+
+            #     # Optional: Adjust phase so its always between 0 and 2pi, recall that phase wraps around every 2pi
+            #     while phase >= 2*numpy.pi:
+            #         phase -= 2*numpy.pi
+            #     while phase < 0:
+            #         phase += 2*numpy.pi
+            # Buffer = out
+
+
             RDS_IQ_mem   = shared_memory.SharedMemory(name='RDS_IQ')
-            RDS_IQ       = numpy.ndarray((2,63), dtype=numpy.float64, buffer=RDS_IQ_mem.buf)
+            RDS_IQ       = numpy.ndarray((2,Rds_Sz), dtype=numpy.float64, buffer=RDS_IQ_mem.buf)
 
             numpy.copyto(RDS_IQ[0],numpy.real(Buffer))
             numpy.copyto(RDS_IQ[1],numpy.imag(Buffer))
@@ -363,18 +390,10 @@ def Graph_Pyqtgraph_Core(Title_1,freq,samp,rds_sz):
     win.nextRow()
 
     p3 = win.addPlot()
-    curve_3 = p3.plot(pen='y')
-    p3.setXRange(-3e3, 3e3, padding=0)
-    p3.setYRange(-90, 0, padding=0)
+    curve_3 = p3.plot(pen=None, symbol='o', symbolPen=None, symbolSize=3, symbolBrush=(255, 255, 255, 100))
+    p3.setXRange(-0.1, 0.1, padding=0)
+    p3.setYRange(-0.1, 0.1, padding=0)
     p3.enableAutoRange('xy', False)  ## stop auto-scaling after the first data set is plotted
-
-    win.nextRow()
-
-    p4 = win.addPlot()
-    curve_4 = p4.plot(pen=None, symbol='o', symbolPen=None, symbolSize=3, symbolBrush=(255, 255, 255, 100))
-    p4.setXRange(-0.1, 0.1, padding=0)
-    p4.setYRange(-0.1, 0.1, padding=0)
-    p4.enableAutoRange('xy', False)  ## stop auto-scaling after the first data set is plotted
 
     
     timer_1 = QtCore.QTimer()
@@ -384,16 +403,12 @@ def Graph_Pyqtgraph_Core(Title_1,freq,samp,rds_sz):
     timer_2.timeout.connect(lambda:   update(curve_2,'FFT_FM_Axis_Graph_Buffer_Global','FFT_FM_Graph_Buffer_Global',samp))
 
     timer_3 = QtCore.QTimer()
-    timer_3.timeout.connect(lambda:   update(curve_3,'FFT_RDS_Axis_Graph_Buffer_Global','FFT_RDS_Graph_Buffer_Global',samp))
-
-    timer_4 = QtCore.QTimer()
-    timer_4.timeout.connect(lambda:   update_IQ(curve_4,'RDS_IQ',63))
+    timer_3.timeout.connect(lambda:   update_IQ(curve_3,'RDS_IQ',rds_sz))
 
 
     timer_1.start()
     timer_2.start()
     timer_3.start()
-    timer_4.start()
 
     pg.exec()
 
@@ -411,19 +426,17 @@ if __name__ == '__main__':
     Rds_Size=numpy.log2(Fm_Size * (RDS_sample_rate/Fm_sample_rate))
     Rds_Size=numpy.floor(Rds_Size)
     Rds_Size=int(2**Rds_Size)
-
+    Rds_Size=int(Rds_Size/16)-1
 
     d_size          = numpy.dtype(numpy.float64).itemsize * 2 * Base_Samples
     d_size_normal   = numpy.dtype(numpy.float64).itemsize * Base_Samples
     d_size_fm       = numpy.dtype(numpy.float64).itemsize * Fm_Size
     d_size_samples  = numpy.dtype(numpy.float64).itemsize * Samples
-    d_size_rds      = numpy.dtype(numpy.float64).itemsize * 2 * 63
+    d_size_rds      = numpy.dtype(numpy.float64).itemsize * 2 * Rds_Size
 
 
     RX_Data_ready = Condition()
     FM_Data_Ready = Condition()
-    RDS_Data_Ready = Condition()
-
 
     RawData_mem     = shared_memory.SharedMemory(create=True, size=d_size, name='RawData')
     RawData         = numpy.ndarray(shape=(2,Base_Samples), dtype=numpy.float64, buffer=RawData_mem.buf)
@@ -431,9 +444,8 @@ if __name__ == '__main__':
     FMData_mem  = shared_memory.SharedMemory(create=True, size=d_size_fm, name='FMData')
     FMData      = numpy.ndarray(shape=(Fm_Size), dtype=numpy.float64, buffer=FMData_mem.buf)
 
-    RDSData_mem  = shared_memory.SharedMemory(create=True, size=d_size_fm, name='RDSData')
-    RDSData      = numpy.ndarray(shape=(Fm_Size), dtype=numpy.float64, buffer=RDSData_mem.buf)
-    
+    RDS_IQ_mem   = shared_memory.SharedMemory(create=True, size=d_size_rds, name='RDS_IQ')
+    RDS_IQ       = numpy.ndarray(shape=(2,Rds_Size), dtype=numpy.float64, buffer=RDS_IQ_mem.buf)
 
     FFT_Data_Graph_Buffer_Global_mem    = shared_memory.SharedMemory(create=True, size=d_size_samples, name='FFT_Data_Graph_Buffer_Global')
     FFT_Data_Graph_Buffer_Global        = numpy.ndarray(shape=(Samples), dtype=numpy.float64, buffer=FFT_Data_Graph_Buffer_Global_mem.buf)
@@ -456,20 +468,16 @@ if __name__ == '__main__':
     FFT_RDS_Axis_Graph_Buffer_Global_mem   = shared_memory.SharedMemory(create=True, size=d_size_samples, name='FFT_RDS_Axis_Graph_Buffer_Global')
     FFT_RDS_Axis_Graph_Buffer_Global       = numpy.ndarray(shape=(Samples), dtype=numpy.float64, buffer=FFT_RDS_Axis_Graph_Buffer_Global_mem.buf)
 
-    RDS_IQ_mem   = shared_memory.SharedMemory(create=True, size=d_size_rds, name='RDS_IQ')
-    RDS_IQ       = numpy.ndarray(shape=(2,63), dtype=numpy.float64, buffer=RDS_IQ_mem.buf)
-
 
    
     Read=Process(target=HackRF_RX, args=(frequency,sample_rate,RX_Data_ready,Base_Samples,Manager_RawData))
     
     Fourier_Signal=Process(target=FFT_samples_Graph, args=('RawData','FFT_Data_Graph_Buffer_Global','FFT_Data_Axis_Graph_Buffer_Global',sample_rate,Samples,RX_Data_ready,Base_Samples))
     Fourier_FM=Process(target=FFT_samples_Graph, args=('FMData','FFT_FM_Graph_Buffer_Global','FFT_FM_Axis_Graph_Buffer_Global',Fm_sample_rate,Samples,FM_Data_Ready,Fm_Size))
-    Fourier_RDS=Process(target=FFT_samples_Graph, args=('RDSData','FFT_RDS_Graph_Buffer_Global','FFT_RDS_Axis_Graph_Buffer_Global',Fm_sample_rate,int(Samples),RDS_Data_Ready,Rds_Size))
 
     Fm=Process(target=FM_demod, args=(sample_rate,Fm_sample_rate,FM_Data_Ready,Base_Samples,Manager_RawData,Manager_FMData,Fm_Size))
     Audio=Process(target=FM_Audio, args=(Fm_sample_rate,"Stereo",Fm_Size,Manager_FMData))
-    FM_RadioDataSystem=Process(target=FM_RDS, args=(Fm_sample_rate,RDS_sample_rate,FM_Data_Ready,RDS_Data_Ready,Fm_Size,Rds_Size))
+    FM_RadioDataSystem=Process(target=FM_RDS, args=(Fm_sample_rate,RDS_sample_rate,FM_Data_Ready,Fm_Size,Rds_Size))
     Graph=Process(target=Graph_Pyqtgraph_Core, args=("FFT",frequency,Samples,Rds_Size))
 
     Read.start()
@@ -479,7 +487,6 @@ if __name__ == '__main__':
     Fourier_FM.start()
     Audio.start()
     FM_RadioDataSystem.start()
-    Fourier_RDS.start()
 
     Graph.start()
 
