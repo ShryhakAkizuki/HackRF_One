@@ -210,7 +210,7 @@ def FM_demod(sample_rate,Fm_sample_rate,Fm_Condition,Manager,FM_Manager,RDS_Mana
                 FMData_mem.close()
                 Fm_Condition.notify()
 
-def FM_Audio(sample_rate,Mode,Data_len,Fm_Manager):
+def FM_Audio(sample_rate,Mode,Fm_Manager):
     
     while True:
 
@@ -274,7 +274,7 @@ def FM_Audio(sample_rate,Mode,Data_len,Fm_Manager):
                 else:
                     wavfile.write('sound1.wav', int(44100), numpy.round(Mono * 32767).astype(numpy.int16))
 
-def FM_RDS(sample_rate,RDS_sample_rate,RDS_Manager,Data_len,Rds_Sz):
+def FM_RDS(sample_rate,RDS_sample_rate,RDS_Manager,Rds_Sz):
 
     phase = 0
     freq = 0
@@ -426,20 +426,20 @@ def FM_RDS(sample_rate,RDS_sample_rate,RDS_Manager,Data_len,Rds_Sz):
             Buffer = out[2:i_out] # remo
 
 
-            # damp=numpy.sqrt(2)/2
-            # bw=2*numpy.pi/200
+            damp=numpy.sqrt(2)/2
+            bw=2*numpy.pi/200
 
-            # alpha = (4 * damp * bw) / (1 + 2 * damp * bw + bw * bw)
+            alpha = (4 * damp * bw) / (1 + 2 * damp * bw + bw * bw)
 
-            # beta = (4 * bw * bw) / (1 + 2 * damp * bw + bw * bw)
+            beta = (4 * bw * bw) / (1 + 2 * damp * bw + bw * bw)
 
 
             # # Fine freq sync
             N = len(Buffer)
 
             # These next two params is what to adjust, to make the feedback loop faster or slower (which impacts stability)
-            alpha = 8
-            beta = 0.2
+            # alpha = 8
+            # beta = 0.2
 
             # alpha = 0.1
             # beta = 0.1
@@ -790,8 +790,8 @@ if __name__ == '__main__':
     Fourier_FM=Process(target=FFT_samples_Graph, args=('FMData','FFT_FM_Graph_Buffer_Global','FFT_FM_Axis_Graph_Buffer_Global',Fm_sample_rate,Samples,FM_Data_Ready,Fm_Size))
 
     Fm=Process(target=FM_demod, args=(sample_rate,Fm_sample_rate,FM_Data_Ready,Manager_Buffer,Manager_FMData,Manager_RDSData,Fm_Size))
-    Audio=Process(target=FM_Audio, args=(Fm_sample_rate,"Stereo",Fm_Size,Manager_FMData))
-    FM_RadioDataSystem=Process(target=FM_RDS, args=(Fm_sample_rate,RDS_sample_rate,Manager_RDSData,Fm_Size,Rds_Size))
+    Audio=Process(target=FM_Audio, args=(Fm_sample_rate,"Stereo",Manager_FMData))
+    FM_RadioDataSystem=Process(target=FM_RDS, args=(Fm_sample_rate,RDS_sample_rate,Manager_RDSData,Rds_Size))
     Graph=Process(target=Graph_Pyqtgraph_Core, args=("FFT",frequency,Samples,Rds_Size))
 
     Read.start()
