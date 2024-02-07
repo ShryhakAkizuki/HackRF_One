@@ -18,18 +18,18 @@ import time
 # La calidad del audio depende directamente de la cantidad de muestras que se utilicen en la HACKRF One
 
 sample_rate=int(2e6)
-frequency=int(88.9e6)
+frequency=int(97.9e6)
 Samples=int(1024*2**4)
 Base_Samples=int(131072)
 # Base_Samples=int(1024*2**5)
 
 Buffer_mult=int(1000)
-Hackrf_LNA=int(16)
+Hackrf_LNA=int(32)
 Hackrf_VGA=int(16)
 Fm_sample_rate=int(250e3)
 RDS_sample_rate=int(19e3)
 
-bufferappend=16
+bufferappend=8
 
 # see Annex B, page 64 of the standard
 def calc_syndrome(x, mlen):
@@ -387,16 +387,16 @@ def FM_RDS(sample_rate,RDS_sample_rate,RDS_Manager,Data_len,Rds_Sz):
             # Sincronizacion de Mueller and mueller clock recovery
 
 
-            # num_iter = len(Buffer)
-            # out=numpy.zeros(num_iter, dtype=numpy.complex64)
+            num_iter = len(Buffer)
+            out=numpy.zeros(num_iter, dtype=numpy.complex64)
 
-            # for n in range(1,num_iter):
-            #     out[n]=Buffer[n]*AGCMult
-            #     error=ref-numpy.abs(out[n])
-            #     AGCMult = AGCMult +mu_AGC*error
-            #     AGCMult=numpy.clip(AGCMult,0,65536)
+            for n in range(1,num_iter):
+                out[n]=Buffer[n]*AGCMult
+                error=ref-numpy.abs(out[n])
+                AGCMult = AGCMult +mu_AGC*error
+                AGCMult=numpy.clip(AGCMult,0,65536)
 
-            # numpy.copyto(Buffer,out)
+            numpy.copyto(Buffer,out)
 
 
             # Symbol sync, using what we did in sync chapter
@@ -418,7 +418,7 @@ def FM_RDS(sample_rate,RDS_sample_rate,RDS_Manager,Data_len,Rds_Sz):
 
 
                 mu += sps + 0.0004*mm_val
-                # mu += sps + 0.3*mm_val
+                # mu += sps + 0.01*mm_val
 
                 i_in += int(numpy.floor(mu)) # round down to nearest int since we are using it as an index
                 mu = mu - numpy.floor(mu) # remove the integer part of mu
@@ -438,8 +438,8 @@ def FM_RDS(sample_rate,RDS_sample_rate,RDS_Manager,Data_len,Rds_Sz):
             N = len(Buffer)
 
             # These next two params is what to adjust, to make the feedback loop faster or slower (which impacts stability)
-            alpha = 8.0
-            beta = 0.002
+            alpha = 8
+            beta = 0.2
 
             # alpha = 0.1
             # beta = 0.1
@@ -452,14 +452,12 @@ def FM_RDS(sample_rate,RDS_sample_rate,RDS_Manager,Data_len,Rds_Sz):
             for i in range(N):
                 out[i] = Buffer[i] * numpy.exp(-1j*phase) # adjust the inumpyut sample by the inverse of the estimated phase offset
 
-                # error = numpy.real(out[i]) * numpy.imag(out[i]) # This is the error formula for 2nd order Costas Loop (e.g. for BPSK)
-                error = numpy.imag(out[i]) # This is the error formula for 2nd order Costas Loop (e.g. for BPSK)
+                error = numpy.real(out[i]) * numpy.imag(out[i]) # This is the error formula for 2nd order Costas Loop (e.g. for BPSK)
 
                 # Advance the loop (recalc phase and freq offset)
                 freq += (beta * error)
                 # print(freq * RDS_sample_rate / (2*numpy.pi*16))
                 phase += freq + (alpha * error)
-                # phase += (alpha * error)
 
                 # Optional: Adjust phase so its always between 0 and 2pi, recall that phase wraps around every 2pi
                 while phase >= 2*numpy.pi:
