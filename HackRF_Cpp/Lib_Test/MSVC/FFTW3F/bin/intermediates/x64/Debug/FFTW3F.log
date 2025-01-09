@@ -1,0 +1,7 @@
+﻿  main.cpp
+C:\Users\oyuky\Desktop\HackRF_Test\Lib_Test\MSVC\FFTW3F\src\main.cpp(1,20): warning C4305: 'inicializando': truncamiento de 'double' a 'float'
+C:\Users\oyuky\Desktop\HackRF_Test\Lib_Test\MSVC\FFTW3F\src\main.cpp(19,17): warning C4244: 'inicializando': conversión de 'double' a 'int'; posible pérdida de datos
+C:\Users\oyuky\Desktop\HackRF_Test\Lib_Test\MSVC\FFTW3F\src\main.cpp(24,28): warning C4244: '=': conversión de 'int' a 'float'; posible pérdida de datos
+C:\Users\oyuky\Desktop\HackRF_Test\Lib_Test\MSVC\FFTW3F\src\main.cpp(29,14): warning C4244: '=': conversión de 'double' a 'float'; posible pérdida de datos
+C:\Users\oyuky\Desktop\HackRF_Test\Lib_Test\MSVC\FFTW3F\src\main.cpp(32,12): warning C4244: '+=': conversión de 'double' a 'float'; posible pérdida de datos
+  FFTW3F.vcxproj -> C:\Users\oyuky\Desktop\HackRF_Test\Lib_Test\MSVC\FFTW3F\bin\x64\Debug\FFTW3F.exe
