@@ -184,7 +184,10 @@ int main(){
         sf::Event event;	// Registro de Eventos de las ventanas
 
         while (window.pollEvent(event)){    						// Si ha ocurrido un evento revisa la cola de eventos
-            if (event.type == sf::Event::Closed)    window.close(); // Si el evento es del tipo de cierre, cierra la ventana.
+            if (event.type == sf::Event::Closed){
+				do_exit = true;
+				if (thread.joinable()) thread.join();				// Espera a que se finalice el Hilo correctamente
+			}    
         }
 
 // ------------------------------------------------ Transferencia de datos desde la HackRF -----------------------------------
@@ -285,8 +288,8 @@ void renderingThread(sf::RenderWindow *window, std::vector<std::complex<float>> 
     window->setActive(true);            // activate the window's context
     std::vector<sf::Vertex> vertices;   // Vector para almacenar los puntos (vertices) del plano cartesiano normalizado
 
-    // Ciclo de ejecucion de la ventana
-    while (window->isOpen()){
+    // Ciclo de ejecucion de la ventana mientras que no se haya solicitado terminar
+    while (window->isOpen() && do_exit == false){
 
 		if(!Graphics_Buffer->empty()){
 			{	// Block for Lock
@@ -311,9 +314,12 @@ void renderingThread(sf::RenderWindow *window, std::vector<std::complex<float>> 
 
         window->display();															// Muestra el contenido en la ventana
     }
+
+	// Finalizacion del Hilo en caso de que se cierre la ventana o se presione CTRL+C
+    window->setActive(false);   			// deactivate the window's context
+	window->close();         				// Cierra la ventana							
 }
 
-// Function to initialize OpenGL settings
 void initializeOpenGL() {
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Set background color (black)
     glMatrixMode(GL_PROJECTION);            // Use projection matrix
