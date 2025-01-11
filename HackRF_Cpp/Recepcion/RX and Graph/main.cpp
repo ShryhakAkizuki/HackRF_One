@@ -36,9 +36,9 @@ typedef enum {						// Modos de operacion de la HACKRF ONE
 
 int rx_callback(hackrf_transfer*);		// Funcion a ejecutar por cada llamada de la recepcion en POSIX
 void handle_error(int, const char*);	// Funcion para comprobar Errores de llamados a funciones de LibHackRF
-BOOL WINAPI sighandler(DWORD);		// Funcion para manejar las señales de terminacion	
-void renderingThread(sf::RenderWindow*, std::vector<std::complex<float>>);
-void initializeOpenGL();
+BOOL WINAPI sighandler(DWORD);			// Funcion para manejar las señales de terminacion	
+void renderingThread(sf::RenderWindow*, std::vector<std::complex<float>>*, double);	// Hilo de renderizado
+void initializeOpenGL();				// Funcion de inicializacion de OpenGL
 
 // ------------------------------ Variables Globales ------------------------------
 bool do_exit = false;											// Variable de terminacion
@@ -54,7 +54,7 @@ const unsigned __int32 samples = 131072;						// Cantidad de muestras a capturar
 transceiver_mode_t transceiver_mode = TRANSCEIVER_MODE_RX;
 
 std::mutex RX_Transfer; 								// Mutual Exclusion for RX transfer Sync between Threads
-std::mutex Graph_Transfer; 								// Mutual Exclusion for RX transfer Sync between Threads
+std::mutex Graph_Transfer; 								// Mutual Exclusion for Graph Transfer Sync between Threads
 
 
 int main(){
@@ -71,7 +71,7 @@ int main(){
 	
 	std::vector<std::complex<float>> Transfer_Buffer;					// Complex Buffer obtaining Data from HackRF and used for Move semantics
 	std::vector<std::complex<float>> Raw_Data (samples);				// Data from RX CallBack
-	std::vector<std::complex<float>> Graph_Transfer_Buffer;				// Data from RX CallBack
+	std::vector<std::complex<float>> Graph_Transfer_Buffer;				// Buffer to transfer the Raw Data to Graph Thread
 
 // ------------------------------ Verificacion de Tolerancias ------------------------------
 
@@ -162,7 +162,7 @@ int main(){
 	}
 
 
-// ------------------------------------------------ Transferencia de datos desde la HackRF -----------------------------------
+// ------------------------------------------------ Creacion de la ventana grafica - Thread -----------------------------------
 
   	// Crea la ventana de SFML
     sf::RenderWindow window (sf::VideoMode(1366,768), "Plotting");
@@ -175,13 +175,21 @@ int main(){
     window.setActive(false);                    // deactivate its OpenGL context
 
    // Genera el Hilo de ejecucion de la ventana
-    std::thread thread(renderingThread, &window, Graph_Transfer_Buffer);
-    thread.join();
+    std::thread thread(renderingThread, &window, &Graph_Transfer_Buffer, 0.5);
 
-// ------------------------------------------------ Creacion de la ventana grafica - Thread -----------------------------------
 
 	// Ejecucion constante hasta que la HackRF deje de transmitir datos
-	while ((hackrf_is_streaming(device) == HACKRF_TRUE) && do_exit == false) {	// Mientras la HackRF este transmitiendo y no se haya solicitado terminar
+	while ((hackrf_is_streaming(device) == HACKRF_TRUE) && do_exit == false) {	
+
+        sf::Event event;	// Registro de Eventos de las ventanas
+
+        while (window.pollEvent(event)){    						// Si ha ocurrido un evento revisa la cola de eventos
+            if (event.type == sf::Event::Closed)    window.close(); // Si el evento es del tipo de cierre, cierra la ventana.
+        }
+
+// ------------------------------------------------ Transferencia de datos desde la HackRF -----------------------------------
+
+
 	// Mientras el buffer de transferencia no este vacio
 	if(!Transfer_Buffer.empty()){				
 			
@@ -194,13 +202,13 @@ int main(){
 
 // ------------------------------------------------ Copia y Transferencia de datos para graficarlos -----------------------------------
 
-	// Solo si el buffer de transferir datos a graficar esta vacio
-	if(Graph_Transfer_Buffer.empty()){		
-			
-			Graph_Transfer_Buffer.resize(samples);								// Redimensionar el buffer de datos complejos
-			
+	// Solo si el buffer de transferir datos a graficar esta vacio y existen datos a transferir
+	if(Graph_Transfer_Buffer.empty() && !Raw_Data.empty()){		
+
 			{	// Block for Lock
 				std::lock_guard<std::mutex> lock(Graph_Transfer); 				// Bloqueo para usar el buffer de numeros complejos
+				Graph_Transfer_Buffer.resize(samples);							// Redimensionar el buffer de datos complejos
+
 				for(int i = 0; i<Raw_Data.size(); i++){							// Transferencia de los datos a un vector vacio
 					Graph_Transfer_Buffer[i]=Raw_Data[i];
 				}
@@ -272,38 +280,36 @@ BOOL WINAPI sighandler(DWORD signum){
 	return FALSE;
 }
 
-void renderingThread(sf::RenderWindow* window, std::vector<std::complex<float>> &Graphics_Buffer){
+void renderingThread(sf::RenderWindow *window, std::vector<std::complex<float>> *Graphics_Buffer, double Y_size){
 
     window->setActive(true);            // activate the window's context
-    std::vector<sf::Vertex> vertices;   // Vector to hold the plot data (points)
+    std::vector<sf::Vertex> vertices;   // Vector para almacenar los puntos (vertices) del plano cartesiano normalizado
 
-    // the rendering loop
+    // Ciclo de ejecucion de la ventana
     while (window->isOpen()){
 
-	std::cout<<Graphics_Buffer.size()<<std::endl;
+		if(!Graphics_Buffer->empty()){
+			{	// Block for Lock
+				std::lock_guard<std::mutex> lock(Graph_Transfer); 					// Bloqueo para usar el buffer de numeros complejos
+				vertices.clear();													// Limpia el buffer de Vertices
 
-	// 	if(!(*Graphics_Buffer).empty()){
-
-	// 		{	// Block for Lock
-	// 			std::lock_guard<std::mutex> lock(Graph_Transfer); 					// Bloqueo para usar el buffer de numeros complejos
-	// 			vertices.clear();
-	// 			for (uint32_t i = 0; i < (*Graphics_Buffer).size(); i++) {
-	// 				vertices.push_back(sf::Vertex(sf::Vector2f(i*2/((*Graphics_Buffer).size()-1)-1,(*Graphics_Buffer)[i].real()*2/(255)-1), sf::Color::White));
-	// 				std::cout<<i*2/((*Graphics_Buffer).size()-1)-1<<std::endl;
-	// 				Graphics_Buffer.clear();
-	// 			}
-	// 		}
-	// 	}
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+				for (int i = 0; i < Graphics_Buffer->size(); i++) { 				// Transfiere y normaliza los datos para representarlos desde -1 a 1 en el Eje X y Eje Y (Normalizado en el Eje Y por Y_Size)
+					vertices.push_back(sf::Vertex(sf::Vector2f(static_cast<double>(i)*2/(Graphics_Buffer->size()-1)-1,((*Graphics_Buffer)[i].real()*2/(255)-1)*Y_size), sf::Color::White));
+				}
+				
+				Graphics_Buffer->clear();											// Limpia el buffer de datos para graficar
+			}
+		}
 
         // OpenGL
-        // glEnableClientState(GL_VERTEX_ARRAY);
-        // glVertexPointer(2, GL_FLOAT, sizeof(sf::Vertex), &vertices[0].position);
-        // glDrawArrays(GL_LINE_STRIP, 0, vertices.size());
-        // glDisableClientState(GL_VERTEX_ARRAY);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);							// Limpia el buffer de OpenGL
 
-        // window->display();
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glVertexPointer(2, GL_FLOAT, sizeof(sf::Vertex), &vertices[0].position);
+        glDrawArrays(GL_LINE_STRIP, 0, vertices.size());
+        glDisableClientState(GL_VERTEX_ARRAY);
+
+        window->display();															// Muestra el contenido en la ventana
     }
 }
 
