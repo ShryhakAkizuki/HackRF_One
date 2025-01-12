@@ -47,25 +47,43 @@ int main(){
   }
   file << "Frequency Samples" <<","<<"Real"<<","<<"Imag"<<std::endl;  // CSV Header
 
-  for(int k = 0; k < N; k++){                       // Calculate DFT through definition 
-    for(int j = 0; j < N; j++){
-      // Fourier[k]+=square_signal[j]*std::complex<float>(cos(-2*M_PI*k*j/(N-1)),sin(-2*M_PI*k*j/N));
-      Fourier[k]+=square_signal[j]*std::exp(std::complex <float>(0,-2*M_PI*k*j/N));
-    }
-    Fourier[k]/=N;  // Normalization
-  }
 
-  for(int k = 0; k < N; k++){                       // Saving Fourier Data with Shift from (-N/2)/period to +(N/2)/period  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // for(int k = 0; k < N; k++){                       // Calculate DFT through definition 
+  //   for(int j = 0; j < N; j++){
+  //     // Fourier[k]+=square_signal[j]*std::complex<float>(cos(-2*M_PI*k*j/(N-1)),sin(-2*M_PI*k*j/(N-1)));
+  //     Fourier[k]+=square_signal[j]*std::exp(std::complex <float>(0,-2*M_PI*k*j/(N-1)));
+  //   }
+  //   Fourier[k]/=N;  // Normalization
+  // }
+
+  // for(int k = 0; k < N; k++){                       // Saving Fourier Data with Shift from (-N/2)/period to +(N/2)/period  
  
-     if(k<N/2.0){
-      file << ((k-N/2.0)+1)/10.0 <<","<< Fourier[k+N/2].real() <<","<<Fourier[k+N/2].imag()<<std::endl;
-    }else{
-      file << (k-N/2.0)/10.0 <<","<< Fourier[k-N/2].real() <<","<<Fourier[k-N/2].imag()<<std::endl;
-    }
+  //    if(k<N/2.0){
+  //     file << ((k-N/2.0)+1)/10.0 <<","<< Fourier[k+N/2].real() <<","<<Fourier[k+N/2].imag()<<std::endl;
+  //   }else{
+  //     file << (k-N/2.0)/10.0 <<","<< Fourier[k-N/2].real() <<","<<Fourier[k-N/2].imag()<<std::endl;
+  //   }
     
-  }
-  file.close();                                 // Close the file
+  // }
 
+  file.close();                                 // Close the file
 
   return 0;
 }
