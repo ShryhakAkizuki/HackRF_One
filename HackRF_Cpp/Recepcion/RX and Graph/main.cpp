@@ -171,7 +171,7 @@ int main(){
     initializeOpenGL();
 
 	window.setPosition(sf::Vector2i(10, 50));   // Establece la posicion de la ventana
-    window.setFramerateLimit(60);               // Limita el Framerate a 60 FPS
+    // window.setFramerateLimit(60);               // Limita el Framerate a 60 FPS
     window.setActive(false);                    // deactivate its OpenGL context
 
    // Genera el Hilo de ejecucion de la ventana
