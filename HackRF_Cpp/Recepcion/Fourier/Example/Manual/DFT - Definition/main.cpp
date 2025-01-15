@@ -4,15 +4,18 @@
 #include <cmath>
 #include <fstream>
 #include <complex.h>
+#include <time.h>
 
-const int N = 1024;
+const int N = 131072;
 
 int main(){
+  clock_t start, end;     // Variables to measure time.
+
   std::ofstream file;     // File variable for control Output CSV
   
-  float samples[N];       // Samples X axis
-  float square_signal[N]; // Square signal (1Hz Period, 0.5 Duty Cycle)
-  float pass = 1.0;       // Variable for make 10 perior signal and the duty cycle
+  float *samples = new float[N];        // Samples X axis
+  float *square_signal = new float[N];  // Square signal (1Hz Period, 0.5 Duty Cycle)
+  float pass = 1.0;                     // Variable for make 10 perior signal and the duty cycle
 
   file.open("Input_Signal.csv");  // Create the Input Signal file
  
@@ -38,7 +41,7 @@ int main(){
   }
     file.close();                                 // Close the file
 
-    std::complex<float> Fourier[N];               // Create Fourier complex array
+    std::complex<float> *Fourier = new std::complex<float>[N];               // Create Fourier complex array
 
   file.open("Output_Signal.csv");                 // Open Output signal file
   if (!file.is_open()){
@@ -46,14 +49,18 @@ int main(){
       return 1;
   }
   file << "Frequency Samples" <<","<<"Real"<<","<<"Imag"<<std::endl;  // CSV Header
+  start = clock();  // Reference time
 
   for(int k = 0; k < N; k++){                       // Calculate DFT through definition 
     for(int j = 0; j < N; j++){
       // Fourier[k]+=square_signal[j]*std::complex<float>(cos(-2*M_PI*k*j/(N-1)),sin(-2*M_PI*k*j/N));
       Fourier[k]+=square_signal[j]*std::exp(std::complex <float>(0,-2*M_PI*k*j/N));
     }
-    Fourier[k]/=N;  // Normalization
+    // Fourier[k]/=N;  // Normalization
   }
+  end = clock();    // End Time
+
+  std::cout<<"Time Elapsed in unsigned: "<< static_cast<unsigned int>(end-start);
 
   for(int k = 0; k < N; k++){                       // Saving Fourier Data with Shift from (-N/2)/period to +(N/2)/period  
  

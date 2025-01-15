@@ -5,15 +5,18 @@
 #include <fstream>
 #include <complex.h>
 #include <vector>
+#include <time.h>
 
-const int N = 1024;                                                         // Number of samples
+const int N = 131072;                                                         // Number of samples
 std::vector<std::complex<float>> FFT(std::vector<std::complex<float>>&);    // FFT algorithm
 
 int main(){
+  clock_t start, end;     // Variables to measure time.
+
   std::ofstream file;     // File variable for control Output CSV
   
-  float samples[N];       // Samples X axis
-  float square_signal[N]; // Square signal (1Hz Period, 0.5 Duty Cycle)
+  float *samples = new float[N];        // Samples X axis
+  float *square_signal = new float[N];  // Square signal (1Hz Period, 0.5 Duty Cycle)
   float pass = 1.0;       // Variable for make 10 perior signal and the duty cycle
 
   file.open("Input_Signal.csv");  // Create the Input Signal file
@@ -53,8 +56,11 @@ int main(){
   for(int i = 0; i < N; i++){
     Input_convert[i]=std::complex<float>(square_signal[i], 0.0);
   }
-
+  start = clock();  // Reference time
   std::vector<std::complex<float>> Fourier = FFT(Input_convert);
+  end = clock();    // End Time
+
+  std::cout<<"Time Elapsed in unsigned: "<< static_cast<unsigned int>(end-start);
 
   for(int k = 0; k < N; k++){                       // Saving Fourier Data with Shift from (-N/2)/period to +(N/2)/period  
  
