@@ -53,7 +53,6 @@ const unsigned __int32 samples = 131072;						// Cantidad de muestras a capturar
 transceiver_mode_t transceiver_mode = TRANSCEIVER_MODE_RX;
 
 std::mutex RX_Transfer; 								// Mutual Exclusion for RX transfer Sync between Threads
-std::mutex Raw_Fourier_Transfer; 						// Mutual Exclusion for Fourier Transfer Sync between Threads
 
 
 int main(){
@@ -182,14 +181,12 @@ int main(){
 	// Solo si el Buffer de datos para realizar la FFT esta vacio y existen datos a transferir
 	if(Fourier_Raw_Data.empty() && !Raw_Data.empty()){		
 
-			{	// Block for Lock
-				std::lock_guard<std::mutex> lock(Raw_Fourier_Transfer); 				// Bloqueo para usar el buffer de numeros complejos
-				Fourier_Raw_Data.resize(samples);							// Redimensionar el buffer de datos complejos
+		Fourier_Raw_Data.resize(samples);								// Redimensionar el buffer de datos complejos
 
-				for(int i = 0; i<Raw_Data.size(); i++){							// Transferencia de los datos a un vector vacio
-					Fourier_Raw_Data[i]=Raw_Data[i];
-				}
-			}
+		for(int i = 0; i<Raw_Data.size(); i++){							// Transferencia de los datos a un vector vacio
+			Fourier_Raw_Data[i]=Raw_Data[i];
+		}
+			
 	}
 
 	}
@@ -264,11 +261,8 @@ void Fourier_Raw_Thread(std::vector<std::complex<float>> *Fourier_Data){
 	while(do_exit == false){	// Hilo de ejecucion hasta que el programa se cierre
 
 		if(!Fourier_Data->empty()){
-			{	// Block for Lock
-				std::lock_guard<std::mutex> lock(Raw_Fourier_Transfer); 	// Bloqueo para realizar la FFT
 				fftwf_execute(p);
 				Fourier_Data->clear();
-			}
 			for(int i = 0; i < 10; i++){	// Print the Fourier Data
 				std::cout<<std::hypot(out[i][0]/samples,out[i][1]/samples)<<std::endl;
 			}
