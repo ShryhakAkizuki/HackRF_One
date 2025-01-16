@@ -8,9 +8,12 @@
                 "/Zi",
                 "/EHsc",
                 "/nologo",
+                "/Zc:__cplusplus",
+                "/std:c++17",
                 "/Fe${fileDirname}\\${fileBasenameNoExtension}.exe",
                 "${file}",
-                "hackrf.lib"
+                "hackrf.lib",
+                "fftw3f.lib"
             ],
             "options": {
                 "cwd": "${fileDirname}"

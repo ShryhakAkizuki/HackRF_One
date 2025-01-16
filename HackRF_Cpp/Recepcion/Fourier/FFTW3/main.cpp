@@ -28,12 +28,16 @@ typedef enum {						// Modos de operacion de la HACKRF ONE
 #include <mutex>
 #include <windows.h>
 #include <signal.h>
+#include <thread>
+#include <fftw3.h>
+#include <cmath>
 
 // ------------------------------ Funciones ------------------------------
 
 int rx_callback(hackrf_transfer*);		// Funcion a ejecutar por cada llamada de la recepcion en POSIX
 void handle_error(int, const char*);	// Funcion para comprobar Errores de llamados a funciones de LibHackRF
-BOOL WINAPI sighandler(DWORD);		// Funcion para manejar las señales de terminacion	
+BOOL WINAPI sighandler(DWORD);			// Funcion para manejar las señales de terminacion	
+void Fourier_Raw_Thread(std::vector<std::complex<float>> *Fourier_Data);	// Hilo de ejecucion para la FFT
 
 // ------------------------------ Variables Globales ------------------------------
 bool do_exit = false;											// Variable de terminacion
@@ -49,6 +53,7 @@ const unsigned __int32 samples = 131072;						// Cantidad de muestras a capturar
 transceiver_mode_t transceiver_mode = TRANSCEIVER_MODE_RX;
 
 std::mutex RX_Transfer; 								// Mutual Exclusion for RX transfer Sync between Threads
+std::mutex Raw_Fourier_Transfer; 						// Mutual Exclusion for Fourier Transfer Sync between Threads
 
 
 int main(){
@@ -61,10 +66,11 @@ int main(){
 	}	
 // ------------------------------ Variables Locales ------------------------------
 
-	int result = 0;											// Variable tipo FLAG --- Status HACKRF
+	int result = 0;												// Variable tipo FLAG --- Status HACKRF
 	
-	std::vector<std::complex<float>> Transfer_Buffer;		// Complex Buffer obtaining Data from HackRF and used for Move semantics
-	std::vector<std::complex<float>> Raw_Data (samples);	// Data from RX CallBack
+	std::vector<std::complex<float>> Transfer_Buffer;			// Complex Buffer obtaining Data from HackRF and used for Move semantics
+	std::vector<std::complex<float>> Raw_Data (samples);		// Data from RX CallBack
+	std::vector<std::complex<float>> Fourier_Raw_Data (samples);// Data for Fourier Transform of the Raw Data
 
 // ------------------------------ Verificacion de Tolerancias ------------------------------
 
@@ -154,6 +160,9 @@ int main(){
 		handle_error(result, "No se pudo iniciar el streaming de recepcion");
 	}
 
+// ----------------------------------------------- Threads -------------------------------------------------------------------
+	
+	std::thread thread(Fourier_Raw_Thread, &Fourier_Raw_Data);	// Hilo de ejecucion para la FFT
 
 // ------------------------------------------------ Transferencia de datos desde la HackRF -----------------------------------
 
@@ -167,6 +176,22 @@ int main(){
 				Raw_Data = std::move(Transfer_Buffer);
 			}
 	}
+
+// ------------------------------------------------ Copia y Transferencia de datos para realizar la FFT -----------------------------------
+
+	// Solo si el Buffer de datos para realizar la FFT esta vacio y existen datos a transferir
+	if(Fourier_Raw_Data.empty() && !Raw_Data.empty()){		
+
+			{	// Block for Lock
+				std::lock_guard<std::mutex> lock(Raw_Fourier_Transfer); 				// Bloqueo para usar el buffer de numeros complejos
+				Fourier_Raw_Data.resize(samples);							// Redimensionar el buffer de datos complejos
+
+				for(int i = 0; i<Raw_Data.size(); i++){							// Transferencia de los datos a un vector vacio
+					Fourier_Raw_Data[i]=Raw_Data[i];
+				}
+			}
+	}
+
 	}
 	
 // ------------------------------------------------ Finalizacion de procesos  -----------------------------------
@@ -229,4 +254,29 @@ BOOL WINAPI sighandler(DWORD signum){
 		return TRUE;
 	}
 	return FALSE;
+}
+
+void Fourier_Raw_Thread(std::vector<std::complex<float>> *Fourier_Data){
+  	fftwf_complex *out = new fftwf_complex[samples];                                    													// Output Fourier N Samples
+	fftwf_plan p = fftwf_plan_dft_1d(samples, reinterpret_cast<fftwf_complex*>(Fourier_Data->data()), out, FFTW_FORWARD, FFTW_ESTIMATE);   	// Fourier plan FFTW complex to complex
+
+
+	while(do_exit == false){	// Hilo de ejecucion hasta que el programa se cierre
+
+		if(!Fourier_Data->empty()){
+			{	// Block for Lock
+				std::lock_guard<std::mutex> lock(Raw_Fourier_Transfer); 	// Bloqueo para realizar la FFT
+				fftwf_execute(p);
+				Fourier_Data->clear();
+			}
+			for(int i = 0; i < 10; i++){	// Print the Fourier Data
+				std::cout<<std::hypot(out[i][0]/samples,out[i][1]/samples)<<std::endl;
+			}
+		}
+
+	}
+
+  	fftwf_destroy_plan(p);                        // Delete Plan
+  	fftwf_free(out);                              // Free output Fourier signal
+
 }
