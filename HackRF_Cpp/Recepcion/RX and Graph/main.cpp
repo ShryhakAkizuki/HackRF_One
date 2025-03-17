@@ -222,7 +222,9 @@ int main(){
 	}
 	
 // ------------------------------------------------ Finalizacion de procesos  -----------------------------------
-
+	Transfer_Buffer.clear();											// Limpia el buffer de datos de la HackRF al terminar la ejecucion
+	Raw_Data.clear();													// Limpia el buffer de datos del hilo principal al terminar la ejecucion
+ 
 	result = hackrf_is_streaming(device);
 	if (do_exit) {
 		std::cerr<<"Terminando el proceso"<<std::endl;

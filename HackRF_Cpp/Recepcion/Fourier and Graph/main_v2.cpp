@@ -221,7 +221,11 @@ int main(){
 // ------------------------------------------------ Finalizacion de procesos  -----------------------------------
 	
 	if (thread_raw_fft.joinable()) thread_raw_fft.join();				// Espera a que se finalice el Hilo correctamente
-
+	
+	Fourier_Raw_Data.clear();											// Limpia el buffer de datos de la FFT al terminar la ejecucion
+	Transfer_Buffer.clear();											// Limpia el buffer de datos de la HackRF al terminar la ejecucion
+	Raw_Data.clear();													// Limpia el buffer de datos del hilo principal al terminar la ejecucion
+  
 	result = hackrf_is_streaming(device);
 	if (do_exit) {
 		std::cerr<<"Terminando el proceso"<<std::endl;
