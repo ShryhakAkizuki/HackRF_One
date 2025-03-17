@@ -38,9 +38,9 @@ typedef enum {						// Modos de operacion de la HACKRF ONE
 int rx_callback(hackrf_transfer*);		// Funcion a ejecutar por cada llamada de la recepcion en POSIX
 void handle_error(int, const char*);	// Funcion para comprobar Errores de llamados a funciones de LibHackRF
 BOOL WINAPI sighandler(DWORD);			// Funcion para manejar las señales de terminacion	
-void Fourier_Raw_Thread(std::vector<std::complex<float>> *Fourier_Data);	// Hilo de ejecucion para la FFT
-void initializeOpenGL();				// Funcion de inicializacion de OpenGL
-void Fourier_Raw_Graph_Thread(sf::RenderWindow *window, std::vector<sf::Vertex> *Vertices);	// Hilo para graficar los datos generados por el Hilo FFT 
+void Fourier_Raw_Thread(std::vector<std::complex<float>>*);	// Hilo de ejecucion para la FFT
+void UpdateOpenGL(int, int);					// Funcion de inicializacion de OpenGL
+void Fourier_Raw_Graph_Thread(sf::RenderWindow*, std::vector<sf::Vertex>*);	// Hilo para graficar los datos generados por el Hilo FFT 
 
 // ------------------------------ Variables Globales ------------------------------
 bool do_exit = false;											// Variable de terminacion
@@ -299,7 +299,8 @@ void Fourier_Raw_Thread(std::vector<std::complex<float>> *Fourier_Data){
     sf::RenderWindow fft_raw_window (sf::VideoMode(1366,768), "FFT Plot - Raw Data");                                                       // Grafica de Fourier	
 
 	// Inicializa OpenGL
-    initializeOpenGL();
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f); 		// Set background color (black)
+    UpdateOpenGL(1,1);							// Set OpenGL aspect ratio
 
 	// Configuracion de la ventana grafica
 	fft_raw_window.setPosition(sf::Vector2i(10, 50)); 	// Posicion Inicial
@@ -320,6 +321,25 @@ void Fourier_Raw_Thread(std::vector<std::complex<float>> *Fourier_Data){
         if (event.type == sf::Event::Closed){
 			do_exit = true;
 			if (thread_graph_raw_fourier.joinable()) thread_graph_raw_fourier.join();				// Espera a que se finalice el Hilo correctamente
+		
+		} else if (event.type == sf::Event::Resized) {
+			int new_width = event.size.width;
+			int new_height = event.size.height;
+
+			// Resize OpenGL viewport
+			glViewport(0, 0, event.size.width, event.size.height);
+
+			// Update projection matrix
+			glMatrixMode(GL_PROJECTION);
+			glLoadIdentity();
+        
+			// Maintain aspect ratio and keep FFT graph scaling correctly
+			float aspectX = static_cast<float>(new_width) / 1366.0f; 	// Normalize to initial width
+			float aspectY = static_cast<float>(new_height) / 768.0f;  	// Normalize to initial height
+			glOrtho(-aspectX, aspectX, -aspectY, aspectY, -1.0, 1.0); 	// Set orthographic projection (for 2D)
+	
+			glMatrixMode(GL_MODELVIEW);
+			glLoadIdentity();
 		}    
     }
 
@@ -354,12 +374,12 @@ void Fourier_Raw_Thread(std::vector<std::complex<float>> *Fourier_Data){
 
 }
 
-void initializeOpenGL() {
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f); 		// Set background color (black)
-    glMatrixMode(GL_PROJECTION);            	// Use projection matrix
-    glLoadIdentity();                       	// Reset the projection matrix
-    glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0); 	// Set orthographic projection (for 2D)
-    glMatrixMode(GL_MODELVIEW);             	// Switch to modelview matrix
+void UpdateOpenGL(int aspectX, int aspectY) {
+    glMatrixMode(GL_PROJECTION);            					// Use projection matrix
+    glLoadIdentity();                       					// Reset the projection matrix
+    glOrtho(-aspectX, aspectX, -aspectY, aspectY, -1.0, 1.0); 	// Set orthographic projection (for 2D)
+    glMatrixMode(GL_MODELVIEW);             					// Switch to modelview matrix
+	glLoadIdentity();                       					// Reset the projection matrix
 }
 
 void Fourier_Raw_Graph_Thread(sf::RenderWindow *window, std::vector<sf::Vertex> *Vertices){
@@ -381,6 +401,18 @@ void Fourier_Raw_Graph_Thread(sf::RenderWindow *window, std::vector<sf::Vertex> 
         
     }
 
+	// Get current window size
+	int width = window->getSize().x;
+	int height = window->getSize().y;
+
+	// Ensure OpenGL viewport updates dynamically
+	glViewport(0, 0, width, height);
+
+	// Update projection matrix
+	float aspectX = static_cast<float>(width) / 1366.0f;  // Normalize to initial width
+	float aspectY = static_cast<float>(height) / 768.0f;  // Normalize to initial height
+	UpdateOpenGL(aspectX, aspectY); 					  // Updates OpenGL aspect ratio
+	
     // OpenGL
     glClear(GL_COLOR_BUFFER_BIT);							// Limpia el buffer de OpenGL
 
