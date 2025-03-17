@@ -39,7 +39,7 @@ int rx_callback(hackrf_transfer*);		// Funcion a ejecutar por cada llamada de la
 void handle_error(int, const char*);	// Funcion para comprobar Errores de llamados a funciones de LibHackRF
 BOOL WINAPI sighandler(DWORD);			// Funcion para manejar las señales de terminacion	
 void Fourier_Raw_Thread(std::vector<std::complex<float>>*);	// Hilo de ejecucion para la FFT
-void UpdateOpenGL(int, int);					// Funcion de inicializacion de OpenGL
+void InitializateOpenGL();				// Funcion de inicializacion de OpenGL
 void Fourier_Raw_Graph_Thread(sf::RenderWindow*, std::vector<sf::Vertex>*);	// Hilo para graficar los datos generados por el Hilo FFT 
 
 // ------------------------------ Variables Globales ------------------------------
@@ -292,15 +292,16 @@ void Fourier_Raw_Thread(std::vector<std::complex<float>> *Fourier_Data){
 	std::vector<float> magnitude (samples);	                                                                                                // Magnitude calculation of FFT
     
     std::vector<sf::Vertex> vertices_buffer;                                                                                                // Vertex Buffer to transfer OpenGL Vertex points
-    float log_scale_offset = -50;		                                                                                                    	// Offset Scale to move at [-1,1] OpenGL window
-	float log_span_factor = 100;	                                                                                                        // Span factor to multiplicate and fit [-1,1] OpenGL window
-
+    float log_scale_offset = -50;		                                                                                                    // Offset Scale to move at [-1,1] OpenGL window
+	float log_span_factor = 100;	               																							// Span factor to multiplicate and fit [-1,1] OpenGL window
+	int w_width = 1366;																														// Initial Window width
+	int w_heigth = 768;                                                                  		                                            // Initial Window heigth						
 // ------------------------------------------------ SFML - Ventana Grafica ---------------------------------------------------------------
-    sf::RenderWindow fft_raw_window (sf::VideoMode(1366,768), "FFT Plot - Raw Data");                                                       // Grafica de Fourier	
+    sf::RenderWindow fft_raw_window (sf::VideoMode(w_width,w_heigth), "FFT Plot - Raw Data");                                               // Grafica de Fourier	
 
 	// Inicializa OpenGL
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f); 		// Set background color (black)
-    UpdateOpenGL(1,1);							// Set OpenGL aspect ratio
+    InitializateOpenGL();						// Set OpenGL aspect ratio
 
 	// Configuracion de la ventana grafica
 	fft_raw_window.setPosition(sf::Vector2i(10, 50)); 	// Posicion Inicial
@@ -322,25 +323,7 @@ void Fourier_Raw_Thread(std::vector<std::complex<float>> *Fourier_Data){
 			do_exit = true;
 			if (thread_graph_raw_fourier.joinable()) thread_graph_raw_fourier.join();				// Espera a que se finalice el Hilo correctamente
 		
-		} else if (event.type == sf::Event::Resized) {
-			int new_width = event.size.width;
-			int new_height = event.size.height;
-
-			// Resize OpenGL viewport
-			glViewport(0, 0, event.size.width, event.size.height);
-
-			// Update projection matrix
-			glMatrixMode(GL_PROJECTION);
-			glLoadIdentity();
-        
-			// Maintain aspect ratio and keep FFT graph scaling correctly
-			float aspectX = static_cast<float>(new_width) / 1366.0f; 	// Normalize to initial width
-			float aspectY = static_cast<float>(new_height) / 768.0f;  	// Normalize to initial height
-			glOrtho(-aspectX, aspectX, -aspectY, aspectY, -1.0, 1.0); 	// Set orthographic projection (for 2D)
-	
-			glMatrixMode(GL_MODELVIEW);
-			glLoadIdentity();
-		}    
+		}
     }
 
  // ------------------------------------------------ Calculo de la FFT y copia de los datos al Vertex Buffer para graficarlos -----------
@@ -374,16 +357,18 @@ void Fourier_Raw_Thread(std::vector<std::complex<float>> *Fourier_Data){
 
 }
 
-void UpdateOpenGL(int aspectX, int aspectY) {
+void InitializateOpenGL() {
     glMatrixMode(GL_PROJECTION);            					// Use projection matrix
     glLoadIdentity();                       					// Reset the projection matrix
-    glOrtho(-aspectX, aspectX, -aspectY, aspectY, -1.0, 1.0); 	// Set orthographic projection (for 2D)
+    glOrtho(-1, 1, -1, 1, -1.0, 1.0); 	// Set orthographic projection (for 2D)
     glMatrixMode(GL_MODELVIEW);             					// Switch to modelview matrix
 	glLoadIdentity();                       					// Reset the projection matrix
 }
 
 void Fourier_Raw_Graph_Thread(sf::RenderWindow *window, std::vector<sf::Vertex> *Vertices){
-    
+	int new_width = window->getSize().x;
+	int new_height = window->getSize().y;
+
     std::vector<sf::Vertex> vertices_buffer(samples);	// Vertex Buffer to transfer OpenGL Vertex points
     window->setActive(true);            				// activate the window's context
 
@@ -402,16 +387,11 @@ void Fourier_Raw_Graph_Thread(sf::RenderWindow *window, std::vector<sf::Vertex> 
     }
 
 	// Get current window size
-	int width = window->getSize().x;
-	int height = window->getSize().y;
+	new_width = window->getSize().x;
+	new_height = window->getSize().y;
 
 	// Ensure OpenGL viewport updates dynamically
-	glViewport(0, 0, width, height);
-
-	// Update projection matrix
-	float aspectX = static_cast<float>(width) / 1366.0f;  // Normalize to initial width
-	float aspectY = static_cast<float>(height) / 768.0f;  // Normalize to initial height
-	UpdateOpenGL(aspectX, aspectY); 					  // Updates OpenGL aspect ratio
+	glViewport(0, 0, new_width, new_height);
 	
     // OpenGL
     glClear(GL_COLOR_BUFFER_BIT);							// Limpia el buffer de OpenGL
