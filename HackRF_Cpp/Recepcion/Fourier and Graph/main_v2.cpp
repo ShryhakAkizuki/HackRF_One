@@ -30,7 +30,6 @@ typedef enum {						// Modos de operacion de la HACKRF ONE
 #include <signal.h>
 #include <thread>
 #include <fftw3.h>
-#include <cmath>
 #include <SFML/Graphics.hpp>
 #include <SFML/OpenGL.hpp>
 
