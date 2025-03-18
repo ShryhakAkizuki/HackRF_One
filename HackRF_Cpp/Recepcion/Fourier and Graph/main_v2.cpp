@@ -354,13 +354,14 @@ void Fourier_Raw_Thread(std::vector<std::complex<float>> *Fourier_Data){
     // Finalizacion del Hilo en caso de que se cierre la ventana o se presione CTRL+C
   	fftwf_destroy_plan(p);                        // Delete Plan
   	fftwf_free(out);                              // Free output Fourier signal
-
+	magnitude.clear();							  // Clear the magnitude buffer
+	vertices_buffer.clear();					  // Clear the vertex buffer
 }
 
 void InitializateOpenGL() {
     glMatrixMode(GL_PROJECTION);            					// Use projection matrix
     glLoadIdentity();                       					// Reset the projection matrix
-    glOrtho(-1, 1, -1, 1, -1.0, 1.0); 	// Set orthographic projection (for 2D)
+    glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0); 					// Set orthographic projection (for 2D)
     glMatrixMode(GL_MODELVIEW);             					// Switch to modelview matrix
 	glLoadIdentity();                       					// Reset the projection matrix
 }
@@ -405,6 +406,7 @@ void Fourier_Raw_Graph_Thread(sf::RenderWindow *window, std::vector<sf::Vertex> 
 
     }
     // Finalizacion del Hilo en caso de que se cierre la ventana o se presione CTRL+C
+	vertices_buffer.clear();	// Limpia el buffer de datos de la FFT al terminar
     glDisableClientState(GL_VERTEX_ARRAY);
     window->setActive(false);  	// deactivate the window's context
 	window->close();         	// Cierra la ventana
